@@ -1,0 +1,23 @@
+# Python virtual environment
+.venv/
+
+# Input files (e.g., Guitar Pro files) because they maybe copyrighted material
+in/
+
+# Generated MIDI output
+out/
+*.mid
+
+# Unzipped .gp archive used for inspecting raw GPIF XML
+tmp/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Packaging build output (pip install of pyproject.toml)
+build/
+*.egg-info/
+
+# Claude Code per-user local settings
+.claude/settings.local.json

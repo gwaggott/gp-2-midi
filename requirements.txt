@@ -1,0 +1,3 @@
+mido==1.3.3
+pyguitarpro==0.11
+packaging==26.0

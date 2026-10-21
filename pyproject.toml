@@ -1,0 +1,26 @@
+# Packages the gpif library (src/gpif/) so other projects can install it:
+#   pip install -e /path/to/gp-2-midi
+# The scripts in src/ (gp2midi.py, gpinfo.py) are not part of the package;
+# they import gpif from their own directory and need no install.
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpif"
+version = "0.1.0"
+description = "Read Guitar Pro files (GP6/7/8 GPIF XML in .gp / .gpx containers; GP3/4/5 via PyGuitarPro) into plain Python data"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+# Reading .gp3 / .gp4 / .gp5 files: pip install gpif[gp5]
+gp5 = ["pyguitarpro>=0.11"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["gpif", "gpif.readers"]

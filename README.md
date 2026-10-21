@@ -1,0 +1,85 @@
+# gp-2-midi
+
+Converts Guitar Pro tabs to MIDI, writing one `.mid` file per track.
+
+It reads Guitar Pro 6/7/8 files (`.gp`, `.gpx`), raw GPIF XML (`.gpif`, `.xml`) and, through [PyGuitarPro](https://github.com/Perlence/PyGuitarPro), Guitar Pro 3–5 files (`.gp3`/`.gp4`/`.gp5`). GP3–5 files get the same articulations as GP6–8 files: ties, dynamics, tempo, accents, ghost and dead notes, staccato, palm muting, hammer-ons / pull-offs, bends, vibrato, slides, harmonics, grace notes and strokes. A few details differ by version; see `docs/formats.md`.
+
+## Setup
+
+Requires Python 3, [mido](https://github.com/mido/mido) and, for GP3–5 files, [PyGuitarPro](https://pypi.org/project/pyguitarpro/) (both in `requirements.txt`).
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+## Usage
+
+```bash
+.venv/bin/python src/gp2midi.py song.gp                    # writes song_track<id>_<name>.mid next to the input
+.venv/bin/python src/gp2midi.py song.gpx -o out/ --all-tracks
+```
+
+By default it converts only fretted tab tracks. Use `--all-tracks` to include drums and other tracks.
+
+## What gets converted
+
+- Ties, dynamics, accents, ghost notes and staccato
+- Hammer-ons and pull-offs, palm mutes and dead notes
+- Bends, vibrato and slides, played as pitch bend
+- Grace notes and harmonics
+- Tempo changes
+- Brush and arpeggio markings, as a roll across the strings
+
+By default the output is humanized: each onset's velocity varies slightly at
+random (all notes of a chord alike), and the notes of a chord are spread a
+few milliseconds apart as the pick crosses the strings, down or up. Use
+`--no-humanize` for the exact score, `--seed N` for a different (but
+repeatable) variation, and `--velocity-spread`, `--strum-time`,
+`--brush-time` and `--arpeggio-time` to adjust it.
+
+Each articulation can be tuned with a command-line switch, e.g. `--bend-range`, `--vibrato-depth` or `--velocity` for a fixed velocity. Run `--help` for the full list. `--channel-per-string` puts each string on its own MIDI channel, so a bend on one string doesn't move the rest of the chord. `--mpe` does the same as an MPE lower zone (manager channel 1, strings on channels 2 and up) for MPE synths, with palm muting sent as MPE timbre (CC74; `--palm-mute-timbre`, `--open-timbre`).
+
+See [docs/articulations.md](docs/articulations.md) for how each articulation maps to MIDI.
+
+## Using the library
+
+The Guitar Pro reading code is a separate package, `gpif` (in `src/gpif/`), which you can use from your own scripts. It has no dependencies for GP6–8 files; GP3–5 files need PyGuitarPro (`pip install -e '/path/to/gp-2-midi[gp5]'`). It returns typed, read-only objects (`Track`, `Note`, …, in `gpif/model.py`):
+
+```python
+from gpif import load_score, pitch_name, tuning_label
+
+score = load_score('song.gp')
+print(score.info.artist, '-', score.info.title)
+for track in score.tracks:
+    if track.is_fretted:
+        print(track.name, [pitch_name(p) for p in track.tuning],
+              tuning_label(track.tuning, track.instrument))
+```
+
+Anything it doesn't parse yet (let ring, whammy bar, …) is still reachable: each object keeps its source XML in `.element`, and notes and beats have a `.properties` dict of raw values.
+
+Scripts in `src/` can import it directly. To use it from another project, install it with `pip install -e /path/to/gp-2-midi`. `src/gpinfo.py` is a worked example: it lists each file's fretted tracks with their tuning. Each file format has a reader class (`gpif.readers`), and `load_score` picks one from the file's content.
+
+## Tests
+
+```bash
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest test
+```
+
+## Known issues
+
+- **Tempo changes in the middle of a bar** are ignored. Such a change
+  also stops every later tempo change in the song from being applied, so
+  the rest of the song plays at the last tempo before it. Only changes at
+  the start of a bar are handled correctly.
+
+## License
+
+MIT; see [LICENSE](LICENSE). The optional GP3–5 support uses
+[PyGuitarPro](https://github.com/Perlence/PyGuitarPro), which is licensed
+under the LGPL-3.0 and installed separately, unmodified.
+
+No Guitar Pro files are included: tabs are often copyrighted, so `in/`
+(where the tools look for input files) is git-ignored. Use your own files.
