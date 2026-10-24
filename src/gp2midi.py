@@ -20,7 +20,7 @@ import math
 import random
 from bisect import bisect_right
 import sys
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 import argparse
 
@@ -48,7 +48,8 @@ from gpif import (
 # Constants
 # ---------------------------------------------------------------------------
 
-# Dynamic marking → note-on velocity (evenly spaced, MF = 80 as before)
+# Dynamic marking → note-on velocity (evenly spaced, MF = 80 as before).
+# The default for --dynamic-velocity.
 DYNAMIC_VELOCITY = {
     'PPP': 16, 'PP': 32, 'P': 48, 'MP': 64,
     'MF': 80, 'F': 96, 'FF': 112, 'FFF': 127,
@@ -188,6 +189,8 @@ class MidiOptions:
     Defaults match the CLI defaults; see the DEFAULT_* constants above.
     """
     velocity: int | None = None           # fixed velocity for every note; None = from the score
+    # dynamic marking → velocity; must include DEFAULT_DYNAMIC (MF)
+    dynamic_velocity: dict[str, int] = field(default_factory=lambda: dict(DYNAMIC_VELOCITY))
     bend_range: int = DEFAULT_BEND_RANGE  # pitch-bend range in semitones (RPN 0)
     hopo_cut: int = DEFAULT_HOPO_CUT
     hopo_overlap: int = DEFAULT_HOPO_OVERLAP
@@ -432,6 +435,31 @@ def mpe_configuration(members: int) -> list[Message]:
     ]
 
 
+def parse_dynamic_velocity(text: str) -> dict[str, int]:
+    """
+    --dynamic-velocity: 'PPP:16,PP:32,...' → DYNAMIC_VELOCITY with those
+    levels replaced (names are case-insensitive, velocities clamped to
+    1-127). Levels not given keep their default.
+    """
+    levels = dict(DYNAMIC_VELOCITY)
+    for pair in text.split(','):
+        if not pair.strip():
+            continue
+        name, sep, value = pair.partition(':')
+        name = name.strip().upper()
+        if not sep or name not in DYNAMIC_VELOCITY:
+            raise argparse.ArgumentTypeError(
+                f"expected DYNAMIC:VELOCITY with DYNAMIC one of "
+                f"{', '.join(DYNAMIC_VELOCITY)}, got {pair.strip()!r}")
+        try:
+            velocity = int(value)
+        except ValueError:
+            raise argparse.ArgumentTypeError(
+                f"velocity for {name} is not a whole number: {value.strip()!r}") from None
+        levels[name] = max(1, min(127, velocity))
+    return levels
+
+
 def note_velocity(
     dynamic: str | None,
     note: Note,
@@ -447,7 +475,8 @@ def note_velocity(
     harmonic layer of a semi harmonic). offset (the humanize variation) is
     added to the dynamic's velocity, so the marks still apply on top.
     """
-    velocity = DYNAMIC_VELOCITY.get(dynamic or DEFAULT_DYNAMIC, DYNAMIC_VELOCITY[DEFAULT_DYNAMIC])
+    levels = options.dynamic_velocity
+    velocity = levels.get(dynamic or DEFAULT_DYNAMIC, levels[DEFAULT_DYNAMIC])
     velocity += offset
     velocity += ACCENT_BOOST.get(note.accent, 0)
     if note.ghost:
@@ -1117,6 +1146,12 @@ def main() -> None:
                         metavar='MS',
                         help='Humanize: delay per string for a chord marked as an arpeggio '
                              f'(default: {DEFAULT_ARPEGGIO_TIME:g}; 0 = off)')
+    parser.add_argument('--dynamic-velocity', type=parse_dynamic_velocity,
+                        default=dict(DYNAMIC_VELOCITY), metavar='DYN:VEL,...',
+                        help='Velocity for each dynamic marking, as comma-separated '
+                             'DYNAMIC:VELOCITY pairs; levels not given keep their default '
+                             '(default: ' + ','.join(f'{k}:{v}' for k, v in DYNAMIC_VELOCITY.items())
+                             + ')')
     parser.add_argument('--velocity', type=int, default=None,
                         metavar='N',
                         help='Fixed note-on velocity 1-127 for every note, ignoring '
@@ -1127,6 +1162,7 @@ def main() -> None:
     # Clamp switch values into their valid ranges
     options = MidiOptions(
         velocity=max(1, min(127, args.velocity)) if args.velocity is not None else None,
+        dynamic_velocity=args.dynamic_velocity,
         bend_range=max(1, min(24, args.bend_range)),
         hopo_cut=max(0, min(127, args.hopo_cut)),
         hopo_overlap=max(0, args.hopo_overlap),

@@ -1,11 +1,13 @@
 """Tests for dynamics, accents, ghost notes and staccato in gp2midi.py."""
 
+import argparse
+
 import pytest
 
 from dataclasses import replace
 
 from conftest import convert
-from gp2midi import DYNAMIC_VELOCITY, note_velocity
+from gp2midi import DYNAMIC_VELOCITY, MidiOptions, note_velocity, parse_dynamic_velocity
 from gpif import TICKS_PER_BEAT, Note
 
 PLAIN = Note()
@@ -40,6 +42,37 @@ def test_ghost_note_is_softer():
     assert note_velocity('MF', replace(PLAIN, ghost=True)) == 48
 
 
+def test_custom_dynamic_velocities():
+    options = MidiOptions(dynamic_velocity={**DYNAMIC_VELOCITY, 'F': 90, 'MF': 70})
+    assert note_velocity('F', PLAIN, options) == 90
+    assert note_velocity(None, PLAIN, options) == 70
+    assert note_velocity('XYZ', PLAIN, options) == 70
+    assert note_velocity('F', replace(PLAIN, accent='normal'), options) == 106
+
+# ---------------------------------------------------------------------------
+# parse_dynamic_velocity (--dynamic-velocity)
+# ---------------------------------------------------------------------------
+
+def test_parse_dynamic_velocity_all_levels():
+    text = ','.join(f'{k}:{v - 1}' for k, v in DYNAMIC_VELOCITY.items())
+    assert parse_dynamic_velocity(text) == {k: v - 1 for k, v in DYNAMIC_VELOCITY.items()}
+
+
+def test_parse_dynamic_velocity_keeps_defaults_for_missing_levels():
+    assert parse_dynamic_velocity(' f : 90 , pp:20,') == {**DYNAMIC_VELOCITY, 'F': 90, 'PP': 20}
+
+
+def test_parse_dynamic_velocity_clamps():
+    levels = parse_dynamic_velocity('PPP:0,FFF:200')
+    assert (levels['PPP'], levels['FFF']) == (1, 127)
+
+
+@pytest.mark.parametrize('text', ['F', 'F=90', 'XX:50', 'F:loud', 'F:9.5'])
+def test_parse_dynamic_velocity_rejects_bad_pairs(text):
+    with pytest.raises(argparse.ArgumentTypeError):
+        parse_dynamic_velocity(text)
+
+
 def test_velocity_clamped():
     assert note_velocity('FFF', replace(PLAIN, accent='heavy')) == 127
     assert note_velocity('PPP', replace(PLAIN, ghost=True)) == 1
@@ -61,6 +94,12 @@ def test_velocity_follows_dynamics_and_accents(tmp_path):
                    [{}, {'accent': 'normal'}, {'ghost': True}, {}],
                    dynamics=['P', 'F', 'F', 'FFF'])
     assert [v for _, v in note_ons(msgs)] == [48, 112, 64, 127]
+
+
+def test_dynamic_velocity_option(tmp_path):
+    msgs = convert(tmp_path, [{}, {}], dynamics=['P', 'F'],
+                   dynamic_velocity={**DYNAMIC_VELOCITY, 'P': 40, 'F': 100})
+    assert [v for _, v in note_ons(msgs)] == [40, 100]
 
 
 def test_fixed_velocity_overrides_score(tmp_path):

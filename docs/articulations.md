@@ -108,7 +108,9 @@ goes in `track_to_midi` in `src/gp2midi.py`.
   `parse_notes` gives `accent` (None / 'normal' / 'heavy'; heavy wins if both
   bits are set), `staccato` and `ghost`.
 - **MIDI** (`gp2midi.note_velocity`): PPP 16, PP 32, P 48, MP 64, MF 80, F 96,
-  FF 112, FFF 127 (missing or unknown → MF). Accent +16, heavy accent +32,
+  FF 112, FFF 127 (missing or unknown → MF; change them with
+  `--dynamic-velocity PPP:16,PP:32,...`, levels not given keep their
+  default). Accent +16, heavy accent +32,
   ghost −32, clamped to 1–127. Staccato notes sound for half their written
   length (a tie continuation still extends them to the tied end).
 - `--velocity N` now means "fixed velocity N for every note, ignoring

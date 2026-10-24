@@ -46,7 +46,7 @@ few milliseconds apart as the pick crosses the strings, down or up. Use
 repeatable) variation, and `--velocity-spread`, `--strum-time`,
 `--brush-time` and `--arpeggio-time` to adjust it.
 
-Each articulation can be tuned with a command-line switch, e.g. `--bend-range`, `--vibrato-depth` or `--velocity` for a fixed velocity. Run `--help` for the full list. `--channel-per-string` puts each string on its own MIDI channel, so a bend on one string doesn't move the rest of the chord. `--mpe` does the same as an MPE lower zone (manager channel 1, strings on channels 2 and up) for MPE synths, with palm muting sent as MPE timbre (CC74; `--palm-mute-timbre`, `--open-timbre`).
+Each articulation can be tuned with a command-line switch, e.g. `--bend-range`, `--vibrato-depth`, `--dynamic-velocity` (e.g. `PPP:16,PP:32,...,FFF:127`) for the velocity of each dynamic marking, or `--velocity` for a fixed velocity. Run `--help` for the full list. `--channel-per-string` puts each string on its own MIDI channel, so a bend on one string doesn't move the rest of the chord. `--mpe` does the same as an MPE lower zone (manager channel 1, strings on channels 2 and up) for MPE synths, with palm muting sent as MPE timbre (CC74; `--palm-mute-timbre`, `--open-timbre`).
 
 See [docs/articulations.md](docs/articulations.md) for how each articulation maps to MIDI.
 
